@@ -1,0 +1,404 @@
+# dangkoo-project
+school project tetris
+#include <iostream>
+#include <windows.h>
+#include <conio.h>
+#include <stdlib.h>
+#include <math.h>
+struct Pos
+{
+	int col;
+	int row;
+};
+Pos gPoly[7][4][4] = {
+	// ▣
+	// ▣▣
+	//   ▣
+	{
+	 {{ 0,-1 }, { 0, 0 }, { 1, 0 }, { 1, 1 }},
+	 {{ 0, 0 }, { 1, 0 }, {-1, 1 }, { 0, 1 }},
+	 {{ 0,-1 }, { 0, 0 }, { 1, 0 }, { 1, 1 }},
+	 {{ 0, 0 }, { 1, 0 }, {-1, 1 }, { 0, 1 }}
+	},
+	//   ▣
+	// ▣▣
+	// ▣
+	{
+	 {{ 0,-1 }, {-1, 0 }, { 0, 0 }, {-1, 1 }},
+	 {{-1, 0 }, { 0, 0 }, { 0, 1 }, { 1, 1 }},
+	 {{ 0,-1 }, {-1, 0 }, { 0, 0 }, {-1, 1 }},
+	 {{-1, 0 }, { 0, 0 }, { 0, 1 }, { 1, 1 }}
+	},
+	// ▣▣▣▣
+	{
+	 {{ 0,-1 }, { 0, 0 }, { 0, 1 }, { 0, 2 }},
+	 {{-1, 0 }, { 0, 0 }, { 1, 0 }, { 2, 0 }},
+	 {{ 0,-1 }, { 0, 0 }, { 0, 1 }, { 0, 2 }},
+	 {{-1, 0 }, { 0, 0 }, { 1, 0 }, { 2, 0 }}
+	},
+	// ▣▣
+	// ▣▣
+	{
+	 {{ 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }},
+	 {{ 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }},
+	 {{ 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }},
+	 {{ 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 }}
+	},
+	// ▣▣▣
+	// ▣
+	{
+	 {{-1,-1 }, { 0,-1 }, { 0, 0 }, { 0, 1 }},
+	 {{-1, 0 }, { 0, 0 }, { 1, 0 }, {-1, 1 }},
+	 {{ 0,-1 }, { 0, 0 }, { 0, 1 }, { 1, 1 }},
+	 {{ 1,-1 }, {-1, 0 }, { 0, 0 }, { 1, 0 }}
+	},
+	// ▣▣▣
+	//     ▣
+	{
+	 {{ 0,-1 }, { 1,-1 }, { 0, 0 }, { 0, 1 }},
+	 {{-1,-1 }, {-1, 0 }, { 0, 0 }, { 1, 0 }},
+	 {{ 0,-1 }, { 0, 0 }, {-1, 1 }, { 0, 1 }},
+	 {{-1, 0 }, { 0, 0 }, { 1, 0 }, { 1, 1 }}
+	},
+	// ▣▣▣
+	//   ▣
+	{
+	 {{ 0,-1 }, {-1, 0 }, { 0, 0 }, { 1, 0 }},
+	 {{ 0,-1 }, { 0, 0 }, { 1, 0 }, { 0, 1 }},
+	 {{-1, 0 }, { 0, 0 }, { 1, 0 }, { 0, 1 }},
+	 {{ 0,-1 }, {-1, 0 }, { 0, 0 }, { 0, 1 }}
+	}
+};
+int GameTable[20][12];
+int gRot;       // 현재 도형의 회전값
+int gSelPoly;      // 현재 도형
+int gNextPoly;      // 다음에 나올 도형의 식별자
+int m_score;      // 점수
+
+Pos gPos = { 5, -3 };       // 현재 도형의 위치 
+Pos gNextPos = { 15,4 };      // 다음에 나올 도형의 위치
+DWORD m_prevTime;     // 이전 시간값
+DWORD m_gameSpeed = 700;     // 게임 스피드
+DWORD m_prevSpeed = 700;     // 이전 게임 스피드
+bool m_ignore = false;      // 스페이스 키를 입력 받았을 때 키를 입력 받지 못하도록 제어하기 위한 변수입니다.
+bool m_end = false;
+void SetCurPos(int x, int y)
+{
+	COORD coord;
+	coord.X = x;
+	coord.Y = y;
+	HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+	SetConsoleCursorPosition(h, coord);
+}
+bool End()
+{
+	if (m_end)
+	{
+		SetCurPos(0, 22);
+		printf("게임이 종료되었습니다.");
+	}
+	return m_end;     // 받을 수 있게끔만 처리
+}
+void Init()
+{
+	for (int i = 0; i < 20; ++i)
+	{
+		for (int j = 0; j < 12; ++j)
+		{
+			switch (GameTable[i][j])
+			{
+			case 0:
+				printf("  ");
+				break;
+			case 1:
+				printf("■");
+				break;
+			case 2:
+				printf("▨");
+				break;
+			}
+		}
+		printf("\n");
+	}
+}
+void DrawPoly(char* str)
+{
+	for (int i = 0; i < 4; ++i)
+	{
+		Pos p;
+		p.col = gPos.col + gPoly[gSelPoly][gRot][i].col;
+		p.row = gPos.row + gPoly[gSelPoly][gRot][i].row;
+		SetCurPos(p.col * 2, p.row);
+		printf(str);
+	}
+}
+int CheckPoly(int grow, int gcol)
+{
+	int count = 0;
+	for (int i = 0; i < 4; ++i)
+	{
+		Pos p;
+		p.col = gcol + gPoly[gSelPoly][gRot][i].col;  // 현재 값에 누적시키면 안되므로, (현재의 위치 + 다음 위치)+각 요소의 값
+		p.row = grow + gPoly[gSelPoly][gRot][i].row;
+		if (p.row < 0)
+			continue;
+		if (GameTable[p.row][p.col] == 0)   // 구한 값과 비교
+			++count;
+	}
+	if (count == 4)
+		return 1;
+	return 0;
+}
+void Next()
+{
+	gSelPoly = gNextPoly;
+	// 다음에 나올 도형값을 다시 랜덤하게 받습니다.
+	for (int i = 0; i < 4; ++i)
+	{
+		Pos p;
+		p.col = gNextPos.col + gPoly[gNextPoly][0][i].col;
+		p.row = gNextPos.row + gPoly[gNextPoly][0][i].row;
+		SetCurPos(p.col * 2, p.row);
+		printf("  ");
+	}
+	gNextPoly = rand() % 7;
+	// 이전 도형의 위치를 깨끗히 지우도록 합니다.   
+	for (int i = 0; i < 4; ++i)
+	{
+		Pos p;
+		p.col = gNextPos.col + gPoly[gNextPoly][0][i].col;
+		p.row = gNextPos.row + gPoly[gNextPoly][0][i].row;
+		SetCurPos(p.col * 2, p.row);
+		printf("▣");
+	}
+}
+void Update()
+{
+	DWORD elapsed = GetTickCount() - m_prevTime;  // 현재 시간 - 이전 시간 = 경과된 시간
+	if (elapsed >= m_gameSpeed)       // 예를 들면 0.8초가 지났다면 한칸 내려주겠다.  내가 설정한 게임 스피드보다 시간이 지났을때
+	{
+		m_prevTime = GetTickCount();     // 시간 값을 다시 얻어옴
+		int nextRow = gPos.row + 1;
+		int nextCol = gPos.col;
+		int count = 0;
+		for (int i = 0; i < 4; ++i)
+		{
+			int rRow = gPoly[gSelPoly][gRot][i].row + nextRow;  // 개별 요소의 다음 위치값
+			int rCol = gPoly[gSelPoly][gRot][i].col + nextCol;
+			// 현재 위치가 음수일 경우 화면 밖이기 때문에 내려갈 수 있도록 count 값만 증가하고, 다시 순회할 수 있도록 처리합니다. (그리고 위치값을 배열에서 사용하고 있기 때문에 배열에서 사용되지 않도록 처리해야 합니다.)
+			if (rRow < 0)
+			{
+				++count;
+				continue;
+			}
+			// 각 요소를 검사 하였을때, 비어 있다면 카운트를 증가합니다.
+			if (GameTable[rRow][rCol] == 0)   // 각 요소를 비교
+			{
+				++count;
+			}
+		}
+		// 아래로 이동할 수가 있다면
+		if (count == 4)
+		{
+			for (int i = 0; i < 4; ++i)
+			{
+				Pos p;
+				p.col = gPos.col + gPoly[gSelPoly][gRot][i].col;
+				p.row = gPos.row + gPoly[gSelPoly][gRot][i].row;
+				if (p.row < 0)
+					continue;       // 그리는 코드기 때문에 컨티뉴 처리를 해야한다. 안하면 음수일경우 엉뚱한 곳에 그린다. 안그리게끔 밑에 코드를 안타게 해야한다.
+				SetCurPos(p.col * 2, p.row);
+				printf("  ");
+			}
+			++gPos.row;
+			for (int i = 0; i < 4; ++i)
+			{
+				Pos p;
+				p.col = gPos.col + gPoly[gSelPoly][gRot][i].col;
+				p.row = gPos.row + gPoly[gSelPoly][gRot][i].row;
+				if (p.row < 0)
+					continue;
+				SetCurPos(p.col * 2, p.row);
+				printf("▣");
+			}
+		}
+		// 아래로 이동할 수 없다면 처리합니다.
+		else
+		{
+			// 키를 다시 입력 받을 수 있도록 변수를 초기화 합니다.
+			m_ignore = false;   // 그래야 키값을 입력 받을 수 있다.
+			m_gameSpeed = m_prevSpeed;
+			// 이동 처리를 할 수 없다면 테이블에 현재 도형을 기록합니다.
+			for (int i = 0; i < 4; ++i)
+			{
+				int rRow = gPoly[gSelPoly][gRot][i].row + gPos.row;
+				int rCol = gPoly[gSelPoly][gRot][i].col + gPos.col;
+				// 이동 처리를 할 수 없으므로 테이블에 값을 기록합니다.
+				GameTable[rRow][rCol] = 2;  // 잔재, 기록할 값이 2번이다.
+				// 해당 위치에 잔재를 표시합니다.
+				SetCurPos(rCol * 2, rRow);
+				printf("▨");
+			}
+			// 새로운 도형이 출력되어야 하기 때문에 위치값, 회전값, 도형값을 다시 설정합니다.
+			gPos = { 5, -3 };
+			gRot = 0;
+			// 다음에 나올 도형값으로 현재 값을 설정합니다.
+			Next();
+		}
+	}
+	// 아래의 코드는 한줄씩 비교해 가면서 가득 채워져 있다면 해당 데이터를 삭제하는 코드입니다.
+	int count = 0;
+	int buffer[20][12] = { 0 };    // 임시 버퍼를 만듬. 메모리 카피 대신 사용
+	for (int row = 0; row < 20; ++row)
+	{
+		for (int col = 1; col < 11; ++col)
+		{
+			buffer[row][0] = 1;
+			buffer[row][11] = 1;
+			buffer[19][col] = 1;
+		}
+	}
+	int currRow = 18;
+	int clearLine = 0;
+	for (int row = 18; row >= 0; row--)   // 18번째부터 시작, 조건이 참이되어야 반드시 참 그러므로 조건이 중요하다. 중괄호가 실행되는 것은 조건과 관련된다.
+	{
+		count = 0;        // 여기서 int count=0;을 해버리면 변수가 18번 생성되어 버린다.
+		for (int col = 1; col < 11; col++)  // for문에서 증감 연산은 전위 후위 지금 상태에서는 상관이 없다.
+		{
+			// 각 요소가 비어 있는지 체크하고, 비어있다면 1증가 합니다.
+			if (GameTable[row][col] == 0)   // 비어있다면 카운트를 증가
+				++count;       // 한라인이 다 비워져있다면 카운트 값은 10이된다.
+		}
+		// 현재 검사하고 있는 행의 요소 중에 하나라도 비어있다면 카피할 대상입니다.
+		if (count > 0)
+		{
+			// 임시 버퍼에 현재 검사중인 라인을 복사합니다.
+			for (int i = 1; i < 11; ++i)    // 0번째는 벽이기 때문에 제외
+				buffer[currRow][i] = GameTable[row][i];
+			--currRow;
+		}
+		else
+		{
+			// 한 라인이 가득 찼다면 점수 카운트 값을 증가합니다.
+			clearLine++;
+		}
+	}
+	for (int row = 0; row < 20; ++row)
+	{
+		for (int col = 0; col < 12; ++col)
+			GameTable[row][col] = buffer[row][col];
+	}
+	if (clearLine > 0)
+	{
+		SetCurPos(0, 0);
+		Init();
+		m_score += pow(clearLine, clearLine) * 100;
+		SetCurPos(25, 0);
+		printf("%d", m_score);
+	}
+	// 종료 조건
+	for (int i = 1; i < 11; ++i)
+	{
+		if (GameTable[0][i] != 0)
+		{
+			m_end = true;
+			return;
+		}
+	}
+}
+void Input()
+{
+	if (m_ignore)
+		return;       // true면 함수를 종료해주겠다.
+	if (_kbhit())
+	{
+		int key = _getch();
+		if (key == 224)
+		{
+			key = _getch();
+			switch (key)
+			{
+			case 72:
+			{
+				int count = 0;
+				int nextRot = (gRot + 1) % 4;    // 배열 인덱스가 0번째부터 3번째까지 있으므로 배열의 범위를 벗어나지 않기 위해 %4, switch case문에서 지역 변수 선언을 하려면 {} 안에 있어야 한다.
+				for (int i = 0; i < 4; ++i)
+				{
+					Pos p;
+					p.col = gPos.col + gPoly[gSelPoly][nextRot][i].col;
+					p.row = gPos.row + gPoly[gSelPoly][nextRot][i].row;  // 회전값만 검사
+					if (p.row < 0)
+						continue;
+					if (GameTable[p.row][p.col] == 0)
+						++count;
+				}
+				if (count == 4)    // 회전이 가능하다면
+				{
+					DrawPoly((char*)"  ");
+					gRot = nextRot;
+					DrawPoly((char*)"▣");
+				}
+			}
+			break;
+			case 75:
+				if (CheckPoly(gPos.row, gPos.col - 1) == 1)  // count가 4라면 실질적인 처리를 해줌
+				{
+					// 아래의 코드는 도형의 이전 위치를 ("  ")비어있도록 출력하는 코드입니다.
+					DrawPoly((char*)"  ");
+					gPos.col -= 1;   //gPos.col는 현재 위치값
+					DrawPoly((char*)"▣");
+				}
+				break;
+			case 77:
+				if (CheckPoly(gPos.row, gPos.col + 1) == 1)
+				{
+					DrawPoly((char*)"  ");
+					gPos.col += 1;
+					DrawPoly((char*)"▣");
+				}
+				break;
+			case 80:
+				if (CheckPoly(gPos.row + 1, gPos.col) == 1)
+				{
+					DrawPoly((char*)"  ");
+					gPos.row += 1;
+					DrawPoly((char*)"▣");
+				}
+				break;
+			}
+		}
+		else if (key == 32)
+		{
+			m_ignore = true;   // 스페이스가 눌렸을때 true 값을 집어 넣게 된다.
+			m_prevSpeed = m_gameSpeed;
+			m_gameSpeed = 10;
+		}
+	}
+}
+void Draw()
+{
+	Init();
+	Next();
+	SetCurPos(25, 0);
+	printf("%d", m_score);
+}
+int main()
+{
+	for (int i = 0; i < 20; ++i)
+	{
+		for (int j = 0; j < 12; ++j)
+		{
+			GameTable[i][0] = 1;
+			GameTable[i][11] = 1;
+			GameTable[19][j] = 1;
+		}
+	}
+	srand(GetTickCount());
+	gSelPoly = rand() % 7;
+	Draw();
+	while (!End())   // false일 경우에 순회
+	{
+		Input();
+		Update();
+	}
+}
